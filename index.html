@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<body>
+<script>
+document.addEventListener("message", function(event) {
+  try {
+    let data = JSON.parse(event.data);
+
+    let text = "Tidak ada jawaban";
+
+    if (data.candidates && data.candidates.length > 0) {
+      text = data.candidates[0].content.parts[0].text;
+    }
+
+    window.ReactNativeWebView.postMessage(text);
+
+  } catch (e) {
+    window.ReactNativeWebView.postMessage("Error parsing JSON");
+  }
+});
+</script>
+</body>
+</html>
