@@ -2,63 +2,52 @@
 (function () {
   function safePostMessage(text) {
     try {
-      if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === "function") {
-        window.ReactNativeWebView.postMessage(String(text));
-      }
+      window.ReactNativeWebView.postMessage(String(text));
     } catch (e) {}
   }
 
-  function normalizeInput(raw) {
-    if (raw == null) return null;
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch (e) {
-        return raw;
+  function getTextFromResponse(data) {
+    try {
+      // ✅ CASE 1: Format normal (parts)
+      if (
+        data.candidates &&
+        data.candidates.length > 0 &&
+        data.candidates[0].content &&
+        data.candidates[0].content.parts
+      ) {
+        let parts = data.candidates[0].content.parts;
+
+        let text = parts.map(p => p.text || "").join("");
+        if (text.trim() !== "") return text;
       }
-    }
-    if (typeof raw === "object") return raw;
-    return null;
-  }
 
-  function extractGeminiText(data) {
-    if (!data) return "Response kosong";
-
-    if (typeof data === "string") {
-      return data.trim() || "Response kosong";
-    }
-
-    if (Array.isArray(data.candidates) && data.candidates.length > 0) {
-      const candidate = data.candidates[0];
-      const parts = candidate?.content?.parts;
-
-      if (Array.isArray(parts) && parts.length > 0) {
-        const text = parts
-          .map(part => {
-            if (typeof part === "string") return part;
-            return part?.text || "";
-          })
-          .join("");
-
-        return text.trim() || "Tidak ada teks jawaban";
+      // ✅ CASE 2: Langsung ada text
+      if (data.text) {
+        return data.text;
       }
-    }
 
-    if (data.text) {
-      return String(data.text).trim() || "Tidak ada teks jawaban";
-    }
+      // ✅ CASE 3: Kandidat ada tapi kosong (biasanya ke-filter)
+      if (data.candidates && data.candidates.length > 0) {
+        return "Jawaban dibatasi atau tidak tersedia";
+      }
 
-    return "Tidak ada jawaban dari AI";
+      return "Tidak ada jawaban dari AI";
+
+    } catch (e) {
+      return "Error membaca response";
+    }
   }
 
   function handleMessage(event) {
     try {
-      const raw = event && typeof event.data !== "undefined" ? event.data : "";
-      const data = normalizeInput(raw);
-      const text = extractGeminiText(data);
+      let raw = event.data;
+      let data = typeof raw === "string" ? JSON.parse(raw) : raw;
+
+      let text = getTextFromResponse(data);
       safePostMessage(text);
+
     } catch (e) {
-      safePostMessage("Terjadi error saat membaca response");
+      safePostMessage("Response bukan JSON valid");
     }
   }
 
