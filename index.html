@@ -1,20 +1,68 @@
 <script>
-document.addEventListener("message", function(event) {
-  let text = "";
-
-  try {
-    let data = JSON.parse(event.data);
-
-    if (data.candidates && data.candidates.length > 0) {
-      text = data.candidates[0].content.parts[0].text;
-    } else {
-      text = "Tidak ada jawaban dari AI";
-    }
-
-  } catch (e) {
-    text = "Response bukan JSON valid";
+(function () {
+  function safePostMessage(text) {
+    try {
+      if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === "function") {
+        window.ReactNativeWebView.postMessage(String(text));
+      }
+    } catch (e) {}
   }
 
-  window.ReactNativeWebView.postMessage(text);
-});
+  function normalizeInput(raw) {
+    if (raw == null) return null;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        return raw;
+      }
+    }
+    if (typeof raw === "object") return raw;
+    return null;
+  }
+
+  function extractGeminiText(data) {
+    if (!data) return "Response kosong";
+
+    if (typeof data === "string") {
+      return data.trim() || "Response kosong";
+    }
+
+    if (Array.isArray(data.candidates) && data.candidates.length > 0) {
+      const candidate = data.candidates[0];
+      const parts = candidate?.content?.parts;
+
+      if (Array.isArray(parts) && parts.length > 0) {
+        const text = parts
+          .map(part => {
+            if (typeof part === "string") return part;
+            return part?.text || "";
+          })
+          .join("");
+
+        return text.trim() || "Tidak ada teks jawaban";
+      }
+    }
+
+    if (data.text) {
+      return String(data.text).trim() || "Tidak ada teks jawaban";
+    }
+
+    return "Tidak ada jawaban dari AI";
+  }
+
+  function handleMessage(event) {
+    try {
+      const raw = event && typeof event.data !== "undefined" ? event.data : "";
+      const data = normalizeInput(raw);
+      const text = extractGeminiText(data);
+      safePostMessage(text);
+    } catch (e) {
+      safePostMessage("Terjadi error saat membaca response");
+    }
+  }
+
+  document.addEventListener("message", handleMessage);
+  window.addEventListener("message", handleMessage);
+})();
 </script>
